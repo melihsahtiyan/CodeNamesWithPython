@@ -1,18 +1,12 @@
 class Word:
-    def __init__(self, word):
+    def __init__(self, word, team):
         self.word = word
+        self.team = team
         self.guessed = False
 
-    def draw(self, screen, font, square_size, square_x, square_y):
-        # Render the text
-        text = font.render(self.word, True, (30, 30, 30))
-
-        # Calculate the size of the text
-        text_width, text_height = font.size(self.word)
-
-        # Calculate the position of the text
-        text_x = square_x + (square_size - text_width) // 2
-        text_y = square_y + (square_size - text_height) // 2
-
-        # Draw the text
-        screen.blit(text, (text_x, text_y))
+    def draw(self, screen, font, x, y, square_size):
+        # Render the word as an image
+        word_image = font.render(self.word, True, (30, 30, 30))
+        word_rect = word_image.get_rect()
+        word_rect.center = (x + square_size / 2, y + square_size / 2)
+        screen.blit(word_image, word_rect)

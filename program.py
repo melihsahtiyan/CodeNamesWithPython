@@ -3,58 +3,37 @@ import random
 
 from word import Word
 
-# Define some colors
-bg_color = (30, 30, 30)
-
-# Set up the pygame window
-screen = pygame.display.set_mode((1000, 750))
-pygame.display.set_caption("Codenames")
-
+# Initialize Pygame
 pygame.init()
 
-# Initialize the font
-font = pygame.font.Font(None, 36)
+# Constants
+SCREEN_WIDTH = 800
+SCREEN_HEIGHT = 600
+FPS = 60
+GRID_ROWS = 5
+GRID_COLS = 5
+SQUARE_SIZE = 100
+SQUARE_SPACE = 15
+FONT_SIZE = 30
 
-# Define the InputField class
-class InputField:
-    def __init__(self, font, color, pos, width, height):
-        self.font = font
-        self.color = color
-        self.pos = pos
-        self.width = width
-        self.height = height
-        self.rect = pygame.Rect(pos, (width, height))
-        self.text = ""
-        self.text_surface = self.font.render(self.text, True, self.color)
+# Colors
+BLACK = (0, 0, 0)
+WHITE = (255, 255, 255)
 
-    def handle_event(self, event):
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_BACKSPACE:
-                self.text = self.text[:-1]
-            else:
-                self.text += event.unicode
-            self.text_surface = self.font.render(self.text, True, self.color)
+# Set up the screen
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 
-    def draw(self, screen):
-        screen.blit(self.text_surface, self.rect)
+pygame.display.set_caption("Codenames")
+pygame.mixer.music.load("brba.mp3")
+pygame.mixer.music.play(-1)
 
+# Set up the clock
+clock = pygame.time.Clock()
 
-# Set up the grid
-grid_rows = 5
-grid_cols = 5
-square_size = 140
-square_spacing = 15
+# Load the font
+font = pygame.font.Font(None, FONT_SIZE)
 
-# Set up the scores
-score_team_1 = 0
-score_team_2 = 0
-
-# Set up the input field
-clue_input = InputField(font, (255, 255, 255), (780, 500), 500, 50)
-
-# Set up the teams
-current_team = 1
-# Set up the list of words
+# List of words
 words = [
     "Apple",
     "Banana",
@@ -83,111 +62,150 @@ words = [
     "Dream",
 ]
 
-# Shuffle the words
+# Shuffle the list of words
 random.shuffle(words)
 
-# Create a list of lists to store the squares
-squares = []
+# Set up the grid
+grid_rows = 5
+grid_cols = 5
+square_size = 100
+
+# Create a list of squares
+squares = [[None] * grid_cols for _ in range(grid_rows)]
+for i in range(grid_rows):
+    for j in range(grid_cols):
+        x = j * SQUARE_SIZE
+        y = i * SQUARE_SIZE
+        squares[i][j] = pygame.Rect(x, y, SQUARE_SIZE, SQUARE_SIZE)
+
+# Set up the teams
+team_1_score = 0
+team_2_score = 0
+team_1 = (0, 0, 255)  # Blue
+team_2 = (255, 0, 0)  # Red
+current_team = team_1
+
+# Initialize the word objects and squares
 word_objects = []
+squares = []
 for i in range(grid_rows):
     row = []
     for j in range(grid_cols):
-        x = j * (square_size + square_spacing)
-        y = i * (square_size + square_spacing)
+        # Choose a team for the word
+        if (i * grid_cols + j) % 2 == 0:
+            team = team_1
+        else:
+            team = team_2
 
-        # Create the square and add it to the list
-        square = pygame.Rect(x, y, square_size, square_size)
+        # Add the word to the list of word objects
+        if (i * grid_cols + j) < len(words):
+            word_objects.append(Word(words[i * grid_cols + j], team))
+
+        # Add the square to the list of squares
+        square = pygame.Rect(j * SQUARE_SIZE, i * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE)
         row.append(square)
-
-        # Make sure the index is within the bounds of the words list
-        if i * grid_cols + j < len(words):
-            # Create a Word object for this square
-            word = Word(words[i * grid_cols + j])
-
-            # Add the Word object to the list
-            word_objects.append(word)
     squares.append(row)
 
 
-running = True
-while running:
+# Set up the input field
+input_text = ""
+input_rect = pygame.Rect(0, 0, 200, 50)
+input_rect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT - 50)
+
+# Set up the game state
+game_over = False
+
+# Game loop
+while not game_over:
     # Handle events
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
-            running = False
-        elif event.type == pygame.MOUSEBUTTONDOWN:
-            # Get the mouse position
-            mouse_x, mouse_y = pygame.mouse.get_pos()
-
-            # Check if the mouse is over a word
+            game_over = True
+        elif event.type == pygame.MOUSEBUTTONUP:
+            # Check if a square was clicked
             for i in range(grid_rows):
                 for j in range(grid_cols):
-                    if i * grid_cols + j < len(word_objects):
-                        # Get the square and word at this position in the grid
-                        square = squares[i][j]
+                    square = squares[i][j]
+                    if square.collidepoint(event.pos):
                         word = word_objects[i * grid_cols + j]
-                    # Check if the mouse is over the square
-                    if square.collidepoint(mouse_x, mouse_y):
-                        # The mouse is over the square, so mark the word as guessed and update the score
-                        word.guessed = True
                         if word.guessed:
-                            if current_team == word.team:
-                                # The team has picked the correct word, so award points
-                                if current_team == 1:
-                                    score_team_1 += 1
-                                    current_team = 2
-                                else:
-                                    score_team_2 += 1
-                                    current_team = 1
+                            continue
+                        word.guessed = True
+                        if word.team == current_team:
+                            if current_team == team_1:
+                                team_1_score += 1
                             else:
-                                # The team has picked the wrong word, so do not award points
-                                pass
-
-        else:
-            # Pass the event to the input field
-            clue_input.handle_event(event)
+                                team_2_score += 1
+                        else:
+                            if current_team == team_1:
+                                current_team = team_2
+                            else:
+                                current_team = team_1
+        elif event.type == pygame.KEYUP:
+            if event.key == pygame.K_RETURN:
+                # Check if the input is a valid word
+                for word in word_objects:
+                    if word.text == input_text and not word.guessed:
+                        word.guessed = True
+                        if word.team == current_team:
+                            if current_team == team_1:
+                                team_1_score += 1
+                            else:
+                                team_2_score += 1
+                        else:
+                            if current_team == team_1:
+                                current_team = team_2
+                            else:
+                                current_team = team_1
+                input_text = ""
+            elif event.key == pygame.K_BACKSPACE:
+                input_text = input_text[:-1]
+            else:
+                input_text += event.unicode
 
     # Draw the background
-    screen.fill(bg_color)
+    screen.fill(BLACK)
 
-    # Draw the squares
+    # Draw the squares and words
     for i in range(grid_rows):
         for j in range(grid_cols):
-            # Make sure the index is within the bounds of the word_objects list
-            if i * grid_cols + j < len(word_objects):
-                # Get the square and word at this position in the grid
-                square = squares[i][j]
+            x = j * SQUARE_SIZE
+            y = i * SQUARE_SIZE
+            square = pygame.Rect(x, y, SQUARE_SIZE, SQUARE_SIZE)
+            pygame.draw.rect(screen, (235, 191, 140), square)
+            if (i * grid_cols + j) < len(word_objects):
                 word = word_objects[i * grid_cols + j]
-
-                # Draw the square
-                pygame.draw.rect(screen, (235, 191, 140), square)
-
-                # Draw the word
-                word.draw(screen, font, square_size, square.x, square.y)
-
-    # Render the scores
-    score_team_1_text = font.render(f"Team 1: {score_team_1}", True, (255, 0, 0))
-    score_team_2_text = font.render(f"Team 2: {score_team_2}", True, (255, 0, 0))
-
-    # Calculate the size of the scores
-    score_team_1_width, score_team_1_height = font.size(f"Team 1: {score_team_1}")
-    score_team_2_width, score_team_2_height = font.size(f"Team 2: {score_team_2}")
-
-    # Calculate the position of the scores
-    score_team_1_x = 780
-    score_team_1_y = 100
-    score_team_2_x = 780
-    score_team_2_y = 600
-
-    # Draw the scores
-    screen.blit(score_team_1_text, (score_team_1_x, score_team_1_y))
-    screen.blit(score_team_2_text, (score_team_2_x, score_team_2_y))
+                if word.team == team_1:
+                    color = team_1
+                else:
+                    color = team_2
+                word.draw(screen, font, x, y, SQUARE_SIZE)
 
     # Draw the input field
-    clue_input.draw(screen)
+    pygame.draw.rect(screen, WHITE, input_rect)
+    input_surface = font.render(input_text, True, BLACK)
+    input_rect = input_surface.get_rect()
+    input_rect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT - 50)
+    screen.blit(input_surface, input_rect)
+
+    # Draw the team scores
+    team_1_surface = font.render(f"Team 1: {team_1_score}", True, team_1)
+    team_1_rect = team_1_surface.get_rect()
+    team_1_rect.left = 10
+    team_1_rect.top = 10
+    screen.blit(team_1_surface, team_1_rect)
+
+    team_2_surface = font.render(f"Team 2: {team_2_score}", True, team_2)
+    team_2_rect = team_2_surface.get_rect()
+    team_2_rect.right = SCREEN_WIDTH - 10
+    team_2_rect.top = 10
+    screen.blit(team_2_surface, team_2_rect)
 
     # Update the display
     pygame.display.flip()
 
-# Quit pygame
+    # Limit the frame rate
+    clock.tick(FPS)
+
+# Quit Pygame
 pygame.quit()
